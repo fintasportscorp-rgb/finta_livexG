@@ -1,4 +1,4 @@
-# FotAlert
+# Finta Spot
 
 Live football dashboard that ranks in-progress matches by how far actual goals
 diverge from expected goals (xG), with a **transparent provider health &
@@ -20,7 +20,7 @@ the ranking and UI layers never change.
 ## Why this exists
 
 FotMob cannot be assumed reachable from every deployed server — a datacenter IP
-may be hard-blocked (HTTP 403 / anti-bot challenge). FotAlert **detects** that
+may be hard-blocked (HTTP 403 / anti-bot challenge). Finta Spot **detects** that
 condition, **classifies** it (temporary vs hard block), **stops hammering**,
 enters a cooldown, and **falls back** to Sportmonks — while clearly labelling
 which provider is live. When FotMob recovers, it automatically switches back

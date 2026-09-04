@@ -54,7 +54,7 @@ export default function Dashboard() {
       <header className="header">
         <div className="brand">
           <h1>
-            FotAlert <span className="brand-live">LIVE</span>
+            Finta Spot <span className="brand-live">LIVE</span>
           </h1>
           <p className="tag">
             In-play matches ranked by <strong>which are most likely to see the next goal</strong> —

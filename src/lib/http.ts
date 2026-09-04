@@ -29,7 +29,7 @@ export async function fetchWithTimeout(
       headers: {
         Accept: "application/json",
         // A plain, honest UA. We do NOT spoof fingerprints to evade anti-bot.
-        "User-Agent": "FotAlert/0.1 (+live-football-monitor)",
+        "User-Agent": "FintaSpot/0.1 (+live-football-monitor)",
         ...(init?.headers ?? {}),
       },
       cache: "no-store",
