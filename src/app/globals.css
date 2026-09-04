@@ -179,6 +179,46 @@ button.toggle.active {
   margin: 14px 0;
 }
 
+/* ---------------- Legend ---------------- */
+.legend {
+  margin: 14px 0 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 8px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.legend-item strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.legend-item .badge {
+  flex: none;
+}
+.metric-chip {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--red);
+  color: #fff;
+  background: rgba(248, 81, 73, 0.22);
+}
+.metric-chip.hot {
+  animation: startle 1.15s ease-in-out infinite;
+}
+
 /* ---------------- Cards ---------------- */
 .cards {
   display: grid;
@@ -241,6 +281,7 @@ button.toggle.active {
   font-weight: 700;
   letter-spacing: 0.05em;
 }
+.chip.time { color: #f0b866; }
 .chip.src-fotmob { color: #7ee2a8; }
 .chip.src-sportmonks { color: #79c0ff; }
 
@@ -267,6 +308,11 @@ button.toggle.active {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.side {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .badge {
@@ -301,6 +347,31 @@ button.toggle.active {
   background: #0d1117;
 }
 
+/* Startling effect: a strongly-negative differential (goal owed) pulses to
+   draw the eye. */
+@keyframes startle {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(248, 81, 73, 0);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(248, 81, 73, 0.28);
+    transform: scale(1.05);
+  }
+}
+.badge.diff.neg.hot {
+  color: #fff;
+  background: rgba(248, 81, 73, 0.28);
+  border-color: var(--red);
+  animation: startle 1.15s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .badge.diff.neg.hot,
+  .metric.hot,
+  .brand-live,
+  .dot.amber { animation: none; }
+}
+
 /* Headline metric */
 .metric {
   border-radius: 10px;
@@ -324,6 +395,10 @@ button.toggle.active {
 .metric.neutral {
   background: var(--panel-2);
 }
+.metric.hot {
+  border-color: var(--red);
+  animation: startle 1.15s ease-in-out infinite;
+}
 .metric-value {
   font-size: 24px;
   font-weight: 800;
@@ -332,17 +407,12 @@ button.toggle.active {
 }
 .metric.pos .metric-value { color: #7ee2a8; }
 .metric.neg .metric-value { color: #ff9a94; }
-.metric-label {
+.metric.hot .metric-value { color: #fff; }
+.metric-unit {
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted);
-}
-.metric-sub {
-  font-size: 10.5px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  margin-top: 2px;
 }
 .metric.na {
   background: rgba(210, 153, 34, 0.08);

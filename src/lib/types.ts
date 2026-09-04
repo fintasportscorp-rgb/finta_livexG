@@ -78,9 +78,20 @@ export interface ProviderHealth {
 
 /** A ranked match plus its computed differentials. */
 export interface RankedMatch extends NormalizedMatch {
-  homeDiff: number | null;
-  awayDiff: number | null;
-  overallDiff: number | null;
+  homeDiff: number | null; // homeGoals - homeXG (negative ⇒ a goal is "owed")
+  awayDiff: number | null; // awayGoals - awayXG
+  overallDiff: number | null; // |homeDiff| + |awayDiff| (kept for reference)
+
+  // Goals "owed" by the scoreline: xG created but not yet converted, summed
+  // across both teams = max(0,-homeDiff) + max(0,-awayDiff). Higher ⇒ a goal is
+  // more overdue. null when xG is unavailable.
+  goalsOwed: number | null;
+
+  // Estimated regulation minutes left (drives the time weighting).
+  remainingMinutes: number | null;
+
+  // Composite ranking score: goalsOwed weighted by remaining opportunity.
+  rankScore: number | null;
 }
 
 /** Runtime status of a single provider, surfaced to the diagnostics UI. */

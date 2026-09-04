@@ -91,6 +91,27 @@ export default function Dashboard() {
         ) : null}
       </div>
 
+      <section className="legend" aria-label="How to read the metrics">
+        <div className="legend-item">
+          <span className="badge diff neg hot">−0.9</span>
+          <span>
+            <strong>Differential = goals − xG</strong> per team. Negative (red, pulsing) means the
+            team has created more than it has scored — <strong>a goal is owed and likely sooner</strong>.
+          </span>
+        </div>
+        <div className="legend-item">
+          <span className="badge diff pos">+0.9</span>
+          <span>Positive (green) means the team has scored above its xG — over-performing.</span>
+        </div>
+        <div className="legend-item">
+          <span className="metric-chip neg hot">1.6</span>
+          <span>
+            The match score is <strong>goals owed</strong> (xG not yet converted), ranked highest
+            when the deficit is large and <strong>more time remains</strong> to convert it.
+          </span>
+        </div>
+      </section>
+
       {data?.notice ? <div className="notice">{data.notice}</div> : null}
       {data?.error ? <div className="error">{data.error}</div> : null}
       {fetchError ? <div className="error">{fetchError}</div> : null}

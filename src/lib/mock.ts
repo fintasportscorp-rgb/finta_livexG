@@ -3,8 +3,8 @@
 // It is clearly flagged `demo: true` so it can never be mistaken for real data.
 // Values are chosen to exercise every metric state:
 //   - home OVER-performs (2 goals on 1.14 xG → +0.86, green)
-//   - away UNDER-performs (1 goal on 1.72 xG → -0.72, red)
-//   - match total goals 3 vs total xG 2.86 → +0.14 (near-neutral)
+//   - away is heavily OWED a goal (1 goal on 2.05 xG → -1.05, red + pulsing)
+//   - match goals owed ≈ 1.05 with 23' left → the "goal due soon" signal
 // ---------------------------------------------------------------------------
 
 import type { NormalizedMatch } from "./types";
@@ -19,7 +19,7 @@ export function mockMatch(): NormalizedMatch {
     homeScore: 2,
     awayScore: 1,
     homeXG: 1.14,
-    awayXG: 1.72,
+    awayXG: 2.05,
     xgAvailable: true,
     matchMinute: 67,
     status: "live",
