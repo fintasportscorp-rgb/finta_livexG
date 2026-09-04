@@ -35,13 +35,17 @@ export function buildAlertEmail(match: RankedMatch): { subject: string; html: st
   const remaining = match.remainingMinutes ?? "—";
   const comp = match.competition ? escapeHtml(match.competition) : "—";
 
-  const subject = `⚽ Goal due: ${match.homeTeam} ${match.homeScore}-${match.awayScore} ${match.awayTeam} — ${owed} xG owed`;
+  const homeXg = fmt(match.homeXG);
+  const awayXg = fmt(match.awayXG);
+
+  const subject = `⚽ Goal due: ${match.homeTeam} ${match.homeScore}-${match.awayScore} ${match.awayTeam} — ${owed} owed · xG ${homeXg}–${awayXg}`;
 
   const text = [
     `${match.homeTeam} ${match.homeScore}-${match.awayScore} ${match.awayTeam}`,
     `Goals owed (xG not yet converted): ${owed}`,
-    `Home: ${match.homeScore} goals on ${fmt(match.homeXG)} xG (diff ${fmt(match.homeDiff)})`,
-    `Away: ${match.awayScore} goals on ${fmt(match.awayXG)} xG (diff ${fmt(match.awayDiff)})`,
+    `Current xG — ${match.homeTeam} (home): ${homeXg} · ${match.awayTeam} (away): ${awayXg}`,
+    `Home: ${match.homeScore} goals on ${homeXg} xG (diff ${fmt(match.homeDiff)})`,
+    `Away: ${match.awayScore} goals on ${awayXg} xG (diff ${fmt(match.awayDiff)})`,
     `Minute: ${minute}'  ·  ~${remaining}' left  ·  ${comp}`,
     `Source: ${match.sourceProvider}`,
     match.sourceUrl,
@@ -57,7 +61,11 @@ export function buildAlertEmail(match: RankedMatch): { subject: string; html: st
       </div>
       <div style="font-size:32px;font-weight:800;color:#c0392b">${owed}</div>
       <div style="text-transform:uppercase;letter-spacing:.05em;font-size:11px;color:#889">goals owed</div>
-      <table style="width:100%;margin-top:14px;border-collapse:collapse;font-size:13px">
+      <div style="margin-top:12px">
+        <span style="display:inline-block;font-size:13px;padding:5px 11px;border:1px solid #e2e8f0;border-radius:999px;margin:0 6px 6px 0">${home} xG <b>${homeXg}</b></span>
+        <span style="display:inline-block;font-size:13px;padding:5px 11px;border:1px solid #e2e8f0;border-radius:999px;margin:0 6px 6px 0">${away} xG <b>${awayXg}</b></span>
+      </div>
+      <table style="width:100%;margin-top:8px;border-collapse:collapse;font-size:13px">
         <tr><td style="padding:4px 0">${home}</td><td style="text-align:right">${match.homeScore} goals · ${fmt(match.homeXG)} xG · diff ${fmt(match.homeDiff)}</td></tr>
         <tr><td style="padding:4px 0">${away}</td><td style="text-align:right">${match.awayScore} goals · ${fmt(match.awayXG)} xG · diff ${fmt(match.awayDiff)}</td></tr>
       </table>
