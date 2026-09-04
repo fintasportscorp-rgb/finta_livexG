@@ -16,8 +16,11 @@ export async function GET(request: Request) {
     const data = await getLiveData();
 
     // ?demo=1 injects one synthetic match so the dashboard can be visualized
-    // even when no real matches are live. It is flagged demo:true downstream.
-    const demo = new URL(request.url).searchParams.get("demo") === "1";
+    // even when no real matches are live. Disabled in production (VERCEL_ENV
+    // === "production") so demo mode is hidden from the live site; still usable
+    // locally and on preview deployments.
+    const allowDemo = process.env.VERCEL_ENV !== "production";
+    const demo = allowDemo && new URL(request.url).searchParams.get("demo") === "1";
     if (demo) {
       const matches = rankMatches([mockMatch(), ...data.matches]);
       return NextResponse.json(

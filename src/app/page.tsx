@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LiveDataResult } from "@/lib/types";
 import { MatchCard } from "./components/MatchCard";
-import { ProviderStatusPanel } from "./components/ProviderStatusPanel";
-import { Diagnostics } from "./components/Diagnostics";
 import { fmtDateTime, fmtTimeAgo, providerLabel } from "./components/format";
 
 const DEFAULT_REFRESH_SECONDS = 60;
@@ -13,20 +11,18 @@ export default function Dashboard() {
   const [data, setData] = useState<LiveDataResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [demo, setDemo] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = useCallback(async (useDemo: boolean) => {
+  const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      const res = await fetch(`/api/live${useDemo ? "?demo=1" : ""}`, { cache: "no-store" });
+      const res = await fetch("/api/live", { cache: "no-store" });
       const json = (await res.json()) as LiveDataResult;
       setData(json);
-      setFetchError(null);
     } catch {
-      setFetchError("Could not reach the FotAlert server.");
+      // A transport failure is presented the same as "no matches" per product intent.
+      setData(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -35,12 +31,12 @@ export default function Dashboard() {
 
   // Auto-refresh on landing (and on every F5, since this remounts) + interval.
   useEffect(() => {
-    load(demo);
-    timer.current = setInterval(() => load(demo), DEFAULT_REFRESH_SECONDS * 1000);
+    load();
+    timer.current = setInterval(load, DEFAULT_REFRESH_SECONDS * 1000);
     return () => {
       if (timer.current) clearInterval(timer.current);
     };
-  }, [load, demo]);
+  }, [load]);
 
   // Tick so the "x seconds ago" label stays live between refreshes.
   useEffect(() => {
@@ -50,6 +46,8 @@ export default function Dashboard() {
   void now;
 
   const source = data?.activeProvider ? providerLabel(data.activeProvider) : null;
+  const hasMatches = !!data && data.matches.length > 0;
+  const showEmpty = !loading && !hasMatches;
 
   return (
     <main className="wrap">
@@ -59,22 +57,13 @@ export default function Dashboard() {
             FotAlert <span className="brand-live">LIVE</span>
           </h1>
           <p className="tag">
-            In-play matches ranked by how far the <strong>score has run ahead of (or behind)
-            expected goals</strong>. Bigger divergence = higher up.
+            In-play matches ranked by <strong>which are most likely to see the next goal</strong> —
+            biggest xG deficit, with enough time left to convert.
           </p>
         </div>
         <div className="head-actions">
-          <span className={`source-pill ${source ? "on" : "off"}`}>
-            {source ? `Source: ${source}` : "No live source"}
-          </span>
-          <button
-            className={`toggle ${demo ? "active" : ""}`}
-            onClick={() => setDemo((d) => !d)}
-            title="Show a synthetic match to preview the layout"
-          >
-            {demo ? "Demo: on" : "Demo: off"}
-          </button>
-          <button className="refresh" onClick={() => load(demo)} disabled={refreshing}>
+          {source ? <span className="source-pill on">Source: {source}</span> : null}
+          <button className="refresh" onClick={load} disabled={refreshing}>
             {refreshing ? "Refreshing…" : "Refresh"}
           </button>
         </div>
@@ -113,33 +102,18 @@ export default function Dashboard() {
       </section>
 
       {data?.notice ? <div className="notice">{data.notice}</div> : null}
-      {data?.error ? <div className="error">{data.error}</div> : null}
-      {fetchError ? <div className="error">{fetchError}</div> : null}
 
-      {loading && !data ? (
-        <div className="empty">Checking providers and loading live matches…</div>
-      ) : null}
+      {loading && !data ? <div className="empty">Loading live matches…</div> : null}
 
-      {data && data.matches.length === 0 && !data.error ? (
-        <div className="empty">
-          No live matches right now.
-          <br />
-          <button className="link" onClick={() => setDemo(true)}>
-            Preview the layout with a demo match →
-          </button>
-        </div>
-      ) : null}
+      {showEmpty ? <div className="empty">No live match available.</div> : null}
 
-      {data && data.matches.length > 0 ? (
+      {hasMatches ? (
         <div className="cards">
-          {data.matches.map((m, i) => (
+          {data!.matches.map((m, i) => (
             <MatchCard key={`${m.sourceProvider}:${m.sourceMatchId}`} match={m} rank={i + 1} />
           ))}
         </div>
       ) : null}
-
-      {data ? <ProviderStatusPanel providers={data.providerStatuses} /> : null}
-      {data ? <Diagnostics data={data} /> : null}
     </main>
   );
 }
