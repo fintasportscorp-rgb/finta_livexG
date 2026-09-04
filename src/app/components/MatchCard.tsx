@@ -1,45 +1,74 @@
 import type { RankedMatch } from "@/lib/types";
-import { fmtDiff, fmtMinute, fmtXg, providerLabel } from "./format";
+import { fmtMinute, fmtXg, providerLabel } from "./format";
+import { classifyDiff, goalsVsXG, matchGoals, matchXG, signed } from "./metrics";
+
+function TeamRow({
+  name,
+  score,
+  xg,
+  diff,
+}: {
+  name: string;
+  score: number;
+  xg: number | null;
+  diff: number | null;
+}) {
+  const tone = classifyDiff(diff);
+  return (
+    <div className="team">
+      <span className="tscore">{score}</span>
+      <span className="tname">{name}</span>
+      <span className="badge xg" title="Expected goals for this team">
+        xG {fmtXg(xg)}
+      </span>
+      <span
+        className={`badge diff ${tone}`}
+        title="Goals scored minus this team's xG (over/under-performance)"
+      >
+        {signed(diff)}
+      </span>
+    </div>
+  );
+}
 
 export function MatchCard({ match, rank }: { match: RankedMatch; rank: number }) {
   const live = match.status === "live" || match.status === "halftime";
-  const srcClass = `src-${match.sourceProvider}`;
+  const headline = goalsVsXG(match);
+  const headlineTone = classifyDiff(headline);
+  const totalXg = matchXG(match);
 
   return (
     <div className="card">
       <div className="rank">{rank}</div>
 
-      <div className="teams">
-        <div className="teamline">
-          <span className="score">{match.homeScore}</span>
-          <span className="teamname">{match.homeTeam}</span>
-        </div>
-        <div className="teamline">
-          <span className="score">{match.awayScore}</span>
-          <span className="teamname">{match.awayTeam}</span>
-        </div>
-
-        <div className="meta">
-          {/* Provenance: LIVE · 67' · FotMob */}
+      <div className="card-main">
+        <div className="card-head">
           <span className={`chip ${live ? "live" : ""}`}>
+            {live ? "● " : ""}
             {fmtMinute(match.matchMinute, match.status)}
           </span>
-          <span className={`chip ${srcClass}`}>{providerLabel(match.sourceProvider)}</span>
-          {match.competition ? <span className="chip">{match.competition}</span> : null}
+          {match.competition ? <span className="chip comp">{match.competition}</span> : null}
+          <span className={`chip src-${match.sourceProvider}`}>
+            {providerLabel(match.sourceProvider)}
+          </span>
+          {match.demo ? <span className="chip demo">DEMO</span> : null}
+        </div>
+
+        <div className="teams">
+          <TeamRow name={match.homeTeam} score={match.homeScore} xg={match.homeXG} diff={match.homeDiff} />
+          <TeamRow name={match.awayTeam} score={match.awayScore} xg={match.awayXG} diff={match.awayDiff} />
         </div>
       </div>
 
-      <div className="diff">
-        {match.overallDiff === null ? (
-          <span className="no-xg">xG unavailable</span>
+      <div className={`metric ${headline === null ? "na" : headlineTone}`}>
+        {headline === null ? (
+          <span className="metric-na">xG unavailable</span>
         ) : (
           <>
-            <span className="overall">{match.overallDiff.toFixed(2)}</span>
-            <span className="detail">
-              xG {fmtXg(match.homeXG)}–{fmtXg(match.awayXG)}
-            </span>
-            <span className="detail">
-              Δ {fmtDiff(match.homeDiff)} / {fmtDiff(match.awayDiff)}
+            <span className="metric-value">{signed(headline)}</span>
+            <span className="metric-label">goals − xG</span>
+            <span className="metric-sub">
+              {matchGoals(match)} goals · {fmtXg(totalXg)} xG
             </span>
           </>
         )}

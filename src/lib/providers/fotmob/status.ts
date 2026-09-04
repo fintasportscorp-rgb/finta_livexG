@@ -35,12 +35,22 @@ function readReason(s: Record<string, unknown>): string {
   return "";
 }
 
-/** Parse the live minute (e.g. "67", "45+2", "HT") into a number or null. */
+/**
+ * Parse the live minute into a number or null. Handles the several shapes
+ * FotMob uses: a plain number, a string ("67", "45+2", "67’", "HT"), or the
+ * `liveTime` object `{ short: "67’", long: "...", maxTime, addedTime }`.
+ */
 export function parseMinute(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+
+  if (value && typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    return parseMinute(o.short ?? o.long ?? o.value ?? o.minute ?? null);
+  }
+
   if (typeof value !== "string") return null;
 
-  const m = value.match(/(\d+)(?:\+(\d+))?/);
+  const m = value.match(/(\d+)(?:\s*\+\s*(\d+))?/);
   if (!m) return null;
   const base = Number.parseInt(m[1], 10);
   const added = m[2] ? Number.parseInt(m[2], 10) : 0;

@@ -5,19 +5,23 @@ import type { LiveDataResult } from "@/lib/types";
 import { MatchCard } from "./components/MatchCard";
 import { ProviderStatusPanel } from "./components/ProviderStatusPanel";
 import { Diagnostics } from "./components/Diagnostics";
-import { fmtTimeAgo } from "./components/format";
+import { fmtDateTime, fmtTimeAgo, providerLabel } from "./components/format";
 
 const DEFAULT_REFRESH_SECONDS = 60;
 
 export default function Dashboard() {
   const [data, setData] = useState<LiveDataResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [demo, setDemo] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (useDemo: boolean) => {
+    setRefreshing(true);
     try {
-      const res = await fetch("/api/live", { cache: "no-store" });
+      const res = await fetch(`/api/live${useDemo ? "?demo=1" : ""}`, { cache: "no-store" });
       const json = (await res.json()) as LiveDataResult;
       setData(json);
       setFetchError(null);
@@ -25,30 +29,68 @@ export default function Dashboard() {
       setFetchError("Could not reach the FotAlert server.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
+  // Auto-refresh on landing (and on every F5, since this remounts) + interval.
   useEffect(() => {
-    load();
-    timer.current = setInterval(load, DEFAULT_REFRESH_SECONDS * 1000);
+    load(demo);
+    timer.current = setInterval(() => load(demo), DEFAULT_REFRESH_SECONDS * 1000);
     return () => {
       if (timer.current) clearInterval(timer.current);
     };
-  }, [load]);
+  }, [load, demo]);
+
+  // Tick so the "x seconds ago" label stays live between refreshes.
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  void now;
+
+  const source = data?.activeProvider ? providerLabel(data.activeProvider) : null;
 
   return (
     <main className="wrap">
-      <div className="header">
-        <div>
-          <h1>FotAlert</h1>
-          <div className="sub">Live matches ranked by goals-vs-xG differential</div>
+      <header className="header">
+        <div className="brand">
+          <h1>
+            FotAlert <span className="brand-live">LIVE</span>
+          </h1>
+          <p className="tag">
+            In-play matches ranked by how far the <strong>score has run ahead of (or behind)
+            expected goals</strong>. Bigger divergence = higher up.
+          </p>
         </div>
-        <button className="refresh" onClick={load}>
-          Refresh
-        </button>
+        <div className="head-actions">
+          <span className={`source-pill ${source ? "on" : "off"}`}>
+            {source ? `Source: ${source}` : "No live source"}
+          </span>
+          <button
+            className={`toggle ${demo ? "active" : ""}`}
+            onClick={() => setDemo((d) => !d)}
+            title="Show a synthetic match to preview the layout"
+          >
+            {demo ? "Demo: on" : "Demo: off"}
+          </button>
+          <button className="refresh" onClick={() => load(demo)} disabled={refreshing}>
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+      </header>
+
+      <div className="refresh-line">
+        <span className={`dot ${refreshing ? "amber" : "green"}`} />
+        Auto-refreshing every {DEFAULT_REFRESH_SECONDS}s
+        {data ? (
+          <>
+            {" · "}last refresh <strong>{fmtDateTime(data.generatedAt)}</strong>{" "}
+            <span className="muted">({fmtTimeAgo(data.generatedAt)})</span>
+          </>
+        ) : null}
       </div>
 
-      {/* Transparent fallback notice */}
       {data?.notice ? <div className="notice">{data.notice}</div> : null}
       {data?.error ? <div className="error">{data.error}</div> : null}
       {fetchError ? <div className="error">{fetchError}</div> : null}
@@ -58,7 +100,13 @@ export default function Dashboard() {
       ) : null}
 
       {data && data.matches.length === 0 && !data.error ? (
-        <div className="empty">No live matches right now.</div>
+        <div className="empty">
+          No live matches right now.
+          <br />
+          <button className="link" onClick={() => setDemo(true)}>
+            Preview the layout with a demo match →
+          </button>
+        </div>
       ) : null}
 
       {data && data.matches.length > 0 ? (
@@ -71,10 +119,6 @@ export default function Dashboard() {
 
       {data ? <ProviderStatusPanel providers={data.providerStatuses} /> : null}
       {data ? <Diagnostics data={data} /> : null}
-
-      {data ? (
-        <div className="updated">Last updated {fmtTimeAgo(data.generatedAt)}</div>
-      ) : null}
     </main>
   );
 }

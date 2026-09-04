@@ -5,13 +5,31 @@
 
 import { NextResponse } from "next/server";
 import { getLiveData } from "@/lib/orchestrator";
+import { rankMatches } from "@/lib/ranking";
+import { mockMatch } from "@/lib/mock";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const data = await getLiveData();
+
+    // ?demo=1 injects one synthetic match so the dashboard can be visualized
+    // even when no real matches are live. It is flagged demo:true downstream.
+    const demo = new URL(request.url).searchParams.get("demo") === "1";
+    if (demo) {
+      const matches = rankMatches([mockMatch(), ...data.matches]);
+      return NextResponse.json(
+        {
+          ...data,
+          matches,
+          notice: data.notice ?? "Demo match shown for visualization (not live data).",
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
     return NextResponse.json(data, {
       headers: { "Cache-Control": "no-store" },
     });

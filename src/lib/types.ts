@@ -45,6 +45,9 @@ export interface NormalizedMatch {
   sourceMatchId: string;
   sourceLastUpdated: string; // ISO 8601
   sourceUrl: string;
+
+  // Set for synthetic demo/mock records so the UI can label them clearly.
+  demo?: boolean;
 }
 
 /** Health classification for a provider connectivity probe. */
