@@ -14,6 +14,12 @@ function intEnv(value: string | undefined, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function floatEnv(value: string | undefined, fallback: number): number {
+  if (value === undefined || value === "") return fallback;
+  const n = Number.parseFloat(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 export interface AppConfig {
   fotmobEnabled: boolean;
   sportmonksEnabled: boolean;
@@ -23,10 +29,18 @@ export interface AppConfig {
   fotmobFailureThreshold: number;
   liveRefreshSeconds: number;
   sportmonksApiKey: string | null;
+
+  // Email alerts (Resend). Secrets read server-side only.
+  alertsEnabled: boolean;
+  resendApiKey: string | null;
+  alertToEmail: string;
+  alertFromEmail: string;
+  alertGoalsOwedThreshold: number;
 }
 
 export function loadConfig(): AppConfig {
   const key = process.env.SPORTMONKS_API_KEY?.trim();
+  const resendKey = process.env.RESEND_API_KEY?.trim() || null;
   return {
     fotmobEnabled: boolEnv(process.env.FOTMOB_ENABLED, true),
     sportmonksEnabled: boolEnv(process.env.SPORTMONKS_ENABLED, true),
@@ -36,6 +50,13 @@ export function loadConfig(): AppConfig {
     fotmobFailureThreshold: intEnv(process.env.FOTMOB_FAILURE_THRESHOLD, 3),
     liveRefreshSeconds: intEnv(process.env.LIVE_REFRESH_SECONDS, 60),
     sportmonksApiKey: key && key.length > 0 ? key : null,
+
+    // Alerts require a Resend key; enabled by default when one is present.
+    alertsEnabled: boolEnv(process.env.ALERTS_ENABLED, true) && resendKey !== null,
+    resendApiKey: resendKey,
+    alertToEmail: process.env.ALERT_TO_EMAIL?.trim() || "finta.sports.corp@gmail.com",
+    alertFromEmail: process.env.ALERT_FROM_EMAIL?.trim() || "Finta Spot <onboarding@resend.dev>",
+    alertGoalsOwedThreshold: floatEnv(process.env.ALERT_GOALS_OWED_THRESHOLD, 1.1),
   };
 }
 
