@@ -38,10 +38,21 @@ export function buildAlertEmail(match: RankedMatch): { subject: string; html: st
   const homeXg = fmt(match.homeXG);
   const awayXg = fmt(match.awayXG);
 
-  const subject = `⚽ Goal due: ${match.homeTeam} ${match.homeScore}-${match.awayScore} ${match.awayTeam} — ${owed} owed · xG ${homeXg}–${awayXg}`;
+  // Current match time label: HT / FT / live minute.
+  const timeLabel =
+    match.status === "halftime"
+      ? "HT"
+      : match.status === "finished"
+        ? "FT"
+        : match.matchMinute !== null
+          ? `${match.matchMinute}'`
+          : "LIVE";
+
+  const subject = `⚽ Goal due (${timeLabel}): ${match.homeTeam} ${match.homeScore}-${match.awayScore} ${match.awayTeam} — ${owed} owed · xG ${homeXg}–${awayXg}`;
 
   const text = [
     `${match.homeTeam} ${match.homeScore}-${match.awayScore} ${match.awayTeam}`,
+    `Match time: ${timeLabel} (~${remaining}' left)`,
     `Goals owed (xG not yet converted): ${owed}`,
     `Current xG — ${match.homeTeam} (home): ${homeXg} · ${match.awayTeam} (away): ${awayXg}`,
     `Home: ${match.homeScore} goals on ${homeXg} xG (diff ${fmt(match.homeDiff)})`,
@@ -58,6 +69,7 @@ export function buildAlertEmail(match: RankedMatch): { subject: string; html: st
     <div style="border:1px solid #e2e8f0;border-radius:12px;padding:16px">
       <div style="font-size:18px;font-weight:700;margin-bottom:10px">
         ${home} <span style="font-variant-numeric:tabular-nums">${match.homeScore}–${match.awayScore}</span> ${away}
+        <span style="font-size:12px;font-weight:700;color:#fff;background:#2ea043;padding:2px 9px;border-radius:999px;margin-left:8px;white-space:nowrap">${timeLabel}${match.status === "live" ? " LIVE" : ""}</span>
       </div>
       <div style="font-size:32px;font-weight:800;color:#c0392b">${owed}</div>
       <div style="text-transform:uppercase;letter-spacing:.05em;font-size:11px;color:#889">goals owed</div>
