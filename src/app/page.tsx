@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { LiveDataResult } from "@/lib/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { LiveDataResult, Metric } from "@/lib/types";
+import { sortByMetric } from "@/lib/ranking";
 import { MatchCard } from "./components/MatchCard";
 import { fmtDateTime, fmtTimeAgo, providerLabel } from "./components/format";
 
@@ -11,6 +12,7 @@ export default function Dashboard() {
   const [data, setData] = useState<LiveDataResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [metric, setMetric] = useState<Metric>("net");
   const [now, setNow] = useState(() => Date.now());
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -21,7 +23,6 @@ export default function Dashboard() {
       const json = (await res.json()) as LiveDataResult;
       setData(json);
     } catch {
-      // A transport failure is presented the same as "no matches" per product intent.
       setData(null);
     } finally {
       setLoading(false);
@@ -29,7 +30,6 @@ export default function Dashboard() {
     }
   }, []);
 
-  // Auto-refresh on landing (and on every F5, since this remounts) + interval.
   useEffect(() => {
     load();
     timer.current = setInterval(load, DEFAULT_REFRESH_SECONDS * 1000);
@@ -38,15 +38,20 @@ export default function Dashboard() {
     };
   }, [load]);
 
-  // Tick so the "x seconds ago" label stays live between refreshes.
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
   void now;
 
+  // Re-sort client-side when the metric filter changes (no refetch needed).
+  const matches = useMemo(
+    () => (data ? sortByMetric(data.matches, metric) : []),
+    [data, metric],
+  );
+
   const source = data?.activeProvider ? providerLabel(data.activeProvider) : null;
-  const hasMatches = !!data && data.matches.length > 0;
+  const hasMatches = matches.length > 0;
   const showEmpty = !loading && !hasMatches;
 
   return (
@@ -57,8 +62,8 @@ export default function Dashboard() {
             Finta Spot <span className="brand-live">LIVE</span>
           </h1>
           <p className="tag">
-            In-play matches ranked by <strong>which are most likely to see the next goal</strong> —
-            biggest xG deficit, with enough time left to convert.
+            In-play matches ranked by <strong>combined xG minus goals scored</strong> — how many
+            goals the chances say are still owed, weighted by time left.
           </p>
         </div>
         <div className="head-actions">
@@ -80,23 +85,43 @@ export default function Dashboard() {
         ) : null}
       </div>
 
+      <div className="filters">
+        <span className="filter-label">Rank by</span>
+        <div className="segmented">
+          <button
+            className={metric === "net" ? "active" : ""}
+            onClick={() => setMetric("net")}
+            title="(homeXG + awayXG) − total goals. A team scoring above its xG offsets it."
+          >
+            Net xG − goals
+          </button>
+          <button
+            className={metric === "owed" ? "active" : ""}
+            onClick={() => setMetric("owed")}
+            title="Per-team unconverted xG; over-performing teams don't offset."
+          >
+            Per-team owed
+          </button>
+        </div>
+      </div>
+
       <section className="legend" aria-label="How to read the metrics">
         <div className="legend-item">
-          <span className="badge diff neg hot">−0.9</span>
+          <span className="metric-chip neg hot">+1.6</span>
           <span>
-            <strong>Differential = goals − xG</strong> per team. Negative (red, pulsing) means the
-            team has created more than it has scored — <strong>a goal is owed and likely sooner</strong>.
+            <strong>
+              {metric === "net" ? "Net xG − goals" : "Goals owed"}
+            </strong>{" "}
+            {metric === "net"
+              ? "= (home xG + away xG) − total goals. High positive ⇒ the teams have created well beyond what they've scored (a team scoring above its xG offsets it). Alerts fire at ≥ 1.1."
+              : "= each team's unconverted xG added up (surplus ignored)."}
           </span>
         </div>
         <div className="legend-item">
-          <span className="badge diff pos">+0.9</span>
-          <span>Positive (green) means the team has scored above its xG — over-performing.</span>
-        </div>
-        <div className="legend-item">
-          <span className="metric-chip neg hot">1.6</span>
+          <span className="badge diff neg hot">−0.9</span>
           <span>
-            The match score is <strong>goals owed</strong> (xG not yet converted), ranked highest
-            when the deficit is large and <strong>more time remains</strong> to convert it.
+            Per-team <strong>goals − xG</strong>. Negative (red, pulsing) = created more than
+            scored; positive (green) = scored above xG. The owed team is shown on top.
           </span>
         </div>
       </section>
@@ -104,13 +129,12 @@ export default function Dashboard() {
       {data?.notice ? <div className="notice">{data.notice}</div> : null}
 
       {loading && !data ? <div className="empty">Loading live matches…</div> : null}
-
       {showEmpty ? <div className="empty">No live match available.</div> : null}
 
       {hasMatches ? (
         <div className="cards">
-          {data!.matches.map((m, i) => (
-            <MatchCard key={`${m.sourceProvider}:${m.sourceMatchId}`} match={m} rank={i + 1} />
+          {matches.map((m, i) => (
+            <MatchCard key={`${m.sourceProvider}:${m.sourceMatchId}`} match={m} rank={i + 1} metric={metric} />
           ))}
         </div>
       ) : null}

@@ -1,30 +1,25 @@
 // ---------------------------------------------------------------------------
 // Ranking. Provider-agnostic — operates purely on the NormalizedMatch model.
 //
-// Signal: a NEGATIVE per-team differential (goals - xG < 0) means a team has
-// created more chances than it has converted, so a goal is "owed" and is more
-// likely to arrive. We surface those matches.
+// Two metrics are computed for every match:
 //
-//   homeDiff  = homeGoals - homeXG
-//   awayDiff  = awayGoals - awayXG
-//   goalsOwed = max(0, -homeDiff) + max(0, -awayDiff)   // xG not yet converted
+//   NET (default): totalXG - totalGoals = (homeXG+awayXG) - (homeScore+awayScore)
+//     A team scoring ABOVE its xG offsets one scoring below. Positive ⇒ the
+//     match has under-scored its chances → goals due. Can be negative.
 //
-// Remaining time matters: the same deficit with 40' left has far more runway to
-// convert than with 5' left. We weight goalsOwed by remaining opportunity, so
-// more time left ranks a match higher for an equal amount owed.
+//   OWED (alternative): max(0,-homeDiff) + max(0,-awayDiff)
+//     Only under-performing teams count; surplus is ignored.
 //
-//   rankScore = goalsOwed * (MIN_WEIGHT + (1-MIN_WEIGHT) * remaining/REG_TIME)
-//
-// Sort: rankScore DESC, then goalsOwed DESC, then remainingMinutes DESC, then
-// matchMinute DESC. Matches without xG can't produce a signal and rank last.
+// Both are weighted by remaining time (more minutes left ⇒ more opportunity),
+// so ranking = metricValue × opportunityFactor(remaining). Sort DESC; matches
+// without xG rank last. The active metric is chosen by the caller/UI filter.
 // ---------------------------------------------------------------------------
 
-import type { MatchStatus, NormalizedMatch, RankedMatch } from "./types";
+import type { MatchStatus, Metric, NormalizedMatch, RankedMatch } from "./types";
 
 const REG_TIME = 90; // regulation minutes used for the remaining-time estimate
 const MIN_WEIGHT = 0.25; // floor so late matches still count, just less
 
-/** Estimated regulation minutes remaining, used for the time weighting. */
 export function remainingMinutes(status: MatchStatus, minute: number | null): number | null {
   switch (status) {
     case "finished":
@@ -49,7 +44,6 @@ function clamp(n: number, lo: number, hi: number): number {
 }
 
 function opportunityFactor(remaining: number | null): number {
-  // Unknown remaining time → treat as mid-match.
   const frac = remaining === null ? 0.5 : clamp(remaining / REG_TIME, 0, 1);
   return MIN_WEIGHT + (1 - MIN_WEIGHT) * frac;
 }
@@ -58,12 +52,11 @@ export function computeDifferentials(match: NormalizedMatch): RankedMatch {
   const remaining = remainingMinutes(match.status, match.matchMinute);
 
   if (!match.xgAvailable || match.homeXG === null || match.awayXG === null) {
-    // Missing xG never yields a fabricated differential or ranking signal.
     return {
       ...match,
       homeDiff: null,
       awayDiff: null,
-      overallDiff: null,
+      netXg: null,
       goalsOwed: null,
       remainingMinutes: remaining,
       rankScore: null,
@@ -72,36 +65,46 @@ export function computeDifferentials(match: NormalizedMatch): RankedMatch {
 
   const homeDiff = match.homeScore - match.homeXG;
   const awayDiff = match.awayScore - match.awayXG;
-  const overallDiff = Math.abs(homeDiff) + Math.abs(awayDiff);
+  const totalXg = match.homeXG + match.awayXG;
+  const totalGoals = match.homeScore + match.awayScore;
+  const netXg = totalXg - totalGoals;
   const goalsOwed = Math.max(0, -homeDiff) + Math.max(0, -awayDiff);
-  const rankScore = goalsOwed * opportunityFactor(remaining);
 
   return {
     ...match,
     homeDiff,
     awayDiff,
-    overallDiff,
+    netXg,
     goalsOwed,
     remainingMinutes: remaining,
-    rankScore,
+    rankScore: rankScoreOf(netXg, remaining),
   };
 }
 
-/**
- * Rank matches. Returns a NEW sorted array (input is not mutated). Matches with
- * a computable rankScore always sort ahead of those without (no xG).
- */
-export function rankMatches(matches: NormalizedMatch[]): RankedMatch[] {
-  const ranked = matches.map(computeDifferentials);
+/** The raw value of a metric for a match (net xG, or per-team owed). */
+export function metricValue(m: RankedMatch, metric: Metric): number | null {
+  return metric === "owed" ? m.goalsOwed : m.netXg;
+}
 
-  return [...ranked].sort((a, b) => {
-    const aHas = a.rankScore !== null;
-    const bHas = b.rankScore !== null;
+/** metricValue weighted by remaining opportunity — the sort key. */
+export function rankScoreOf(value: number | null, remaining: number | null): number | null {
+  return value === null ? null : value * opportunityFactor(remaining);
+}
+
+/** Sort a NEW array by the chosen metric × time. Matches without xG go last. */
+export function sortByMetric(matches: RankedMatch[], metric: Metric): RankedMatch[] {
+  return [...matches].sort((a, b) => {
+    const av = metricValue(a, metric);
+    const bv = metricValue(b, metric);
+    const aHas = av !== null;
+    const bHas = bv !== null;
     if (aHas !== bHas) return aHas ? -1 : 1;
 
     if (aHas && bHas) {
-      if (b.rankScore! !== a.rankScore!) return b.rankScore! - a.rankScore!;
-      if (b.goalsOwed! !== a.goalsOwed!) return b.goalsOwed! - a.goalsOwed!;
+      const as = rankScoreOf(av, a.remainingMinutes)!;
+      const bs = rankScoreOf(bv, b.remainingMinutes)!;
+      if (bs !== as) return bs - as;
+      if (bv! !== av!) return bv! - av!;
       const aRem = a.remainingMinutes ?? -1;
       const bRem = b.remainingMinutes ?? -1;
       if (bRem !== aRem) return bRem - aRem;
@@ -111,4 +114,9 @@ export function rankMatches(matches: NormalizedMatch[]): RankedMatch[] {
     const bMin = b.matchMinute ?? -1;
     return bMin - aMin;
   });
+}
+
+/** Compute differentials and rank by the given metric (default: net). */
+export function rankMatches(matches: NormalizedMatch[], metric: Metric = "net"): RankedMatch[] {
+  return sortByMetric(matches.map(computeDifferentials), metric);
 }

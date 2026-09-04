@@ -51,7 +51,9 @@ async function fetchMatches(): Promise<{ matches: RankedMatch[]; source: string 
     });
     if (!res.ok) throw new Error(`SITE_URL /api/live returned HTTP ${res.status}`);
     const data = (await res.json()) as LiveDataResult;
-    return { matches: data.matches, source: `${siteUrl} (${data.activeProvider ?? "none"})` };
+    // Recompute locally so metrics (netXg) are correct even if the deployed
+    // site is serving an older payload shape.
+    return { matches: rankMatches(data.matches), source: `${siteUrl} (${data.activeProvider ?? "none"})` };
   }
   const data = await getLiveData();
   // getLiveData already ranks, but re-rank defensively in case shape changes.

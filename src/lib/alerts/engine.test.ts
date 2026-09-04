@@ -23,7 +23,7 @@ function ranked(partial: Partial<RankedMatch>): RankedMatch {
     sourceUrl: "",
     homeDiff: -1.5,
     awayDiff: 0,
-    overallDiff: 1.5,
+    netXg: 1.5,
     goalsOwed: 1.5,
     remainingMinutes: 50,
     rankScore: 1,
@@ -56,7 +56,7 @@ describe("decide", () => {
 
 describe("evaluateCrossings", () => {
   it("emails on first crossing and carries the state forward", () => {
-    const m = ranked({ sourceMatchId: "a", goalsOwed: 1.4 });
+    const m = ranked({ sourceMatchId: "a", netXg: 1.4 });
     const r1 = evaluateCrossings([m], T, []);
     expect(r1.toSend).toHaveLength(1);
     expect(r1.alerted).toContain("fotmob:a");
@@ -68,8 +68,8 @@ describe("evaluateCrossings", () => {
 
   it("re-alerts on a fresh crossing after it dropped and rose again", () => {
     const key = "fotmob:a";
-    const high = ranked({ sourceMatchId: "a", goalsOwed: 1.4 });
-    const low = ranked({ sourceMatchId: "a", goalsOwed: 0.4 });
+    const high = ranked({ sourceMatchId: "a", netXg: 1.4 });
+    const low = ranked({ sourceMatchId: "a", netXg: 0.4 });
 
     const afterFirst = evaluateCrossings([high], T, []).alerted;
     const afterDrop = evaluateCrossings([low], T, afterFirst).alerted;
@@ -80,13 +80,13 @@ describe("evaluateCrossings", () => {
   });
 
   it("never alerts demo matches", () => {
-    const r = evaluateCrossings([ranked({ goalsOwed: 2, demo: true })], T, []);
+    const r = evaluateCrossings([ranked({ netXg: 2, demo: true })], T, []);
     expect(r.toSend).toHaveLength(0);
   });
 
   it("tracks matches independently", () => {
-    const a = ranked({ sourceMatchId: "a", goalsOwed: 1.4 });
-    const b = ranked({ sourceMatchId: "b", goalsOwed: 1.4 });
+    const a = ranked({ sourceMatchId: "a", netXg: 1.4 });
+    const b = ranked({ sourceMatchId: "b", netXg: 1.4 });
     const r = evaluateCrossings([a, b], T, []);
     expect(r.toSend).toHaveLength(2);
     expect(r.alerted).toEqual(["fotmob:a", "fotmob:b"]);

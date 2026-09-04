@@ -179,6 +179,45 @@ button.toggle.active {
   margin: 14px 0;
 }
 
+/* ---------------- Filters ---------------- */
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 4px;
+}
+.filter-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.segmented button {
+  background: var(--panel);
+  color: var(--muted);
+  border: none;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+.segmented button.active {
+  background: var(--green-soft);
+  color: #7ee2a8;
+}
+.segmented button:hover:not(.active) {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
 /* ---------------- Legend ---------------- */
 .legend {
   margin: 14px 0 4px;

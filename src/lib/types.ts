@@ -5,6 +5,11 @@
 
 export type ProviderId = "fotmob" | "sportmonks";
 
+// Which ranking/display signal is active.
+//   "net"  → (homeXG + awayXG) - (homeScore + awayScore); over-scoring offsets.
+//   "owed" → per-team unconverted xG: max(0,-homeDiff) + max(0,-awayDiff).
+export type Metric = "net" | "owed";
+
 export type MatchStatus =
   | "scheduled"
   | "live"
@@ -80,17 +85,20 @@ export interface ProviderHealth {
 export interface RankedMatch extends NormalizedMatch {
   homeDiff: number | null; // homeGoals - homeXG (negative ⇒ a goal is "owed")
   awayDiff: number | null; // awayGoals - awayXG
-  overallDiff: number | null; // |homeDiff| + |awayDiff| (kept for reference)
 
-  // Goals "owed" by the scoreline: xG created but not yet converted, summed
-  // across both teams = max(0,-homeDiff) + max(0,-awayDiff). Higher ⇒ a goal is
-  // more overdue. null when xG is unavailable.
+  // NET signal (default): total xG minus total goals. Positive ⇒ the teams have
+  // created more than they've scored (goals due); a team scoring above its xG
+  // reduces it, so this can be negative. null when xG is unavailable.
+  netXg: number | null;
+
+  // Per-team unconverted xG (alternative metric, no offset):
+  // max(0,-homeDiff) + max(0,-awayDiff). null when xG is unavailable.
   goalsOwed: number | null;
 
   // Estimated regulation minutes left (drives the time weighting).
   remainingMinutes: number | null;
 
-  // Composite ranking score: goalsOwed weighted by remaining opportunity.
+  // Composite ranking score for the default (net) metric: value × opportunity.
   rankScore: number | null;
 }
 

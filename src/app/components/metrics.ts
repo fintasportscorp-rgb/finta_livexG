@@ -1,18 +1,15 @@
 // ---------------------------------------------------------------------------
-// Display-metric helpers for a ranked match. Pure functions over the normalized
-// model — no provider knowledge. Used by MatchCard.
-//
-// A negative per-team differential (goals - xG) means a goal is "owed". The
-// stronger the deficit, the more it should draw the eye ("startling").
+// Display-metric helpers. Pure functions over the ranked model — no provider
+// knowledge. Used by MatchCard and the page filter.
 // ---------------------------------------------------------------------------
 
-import type { RankedMatch } from "@/lib/types";
+import type { Metric, RankedMatch } from "@/lib/types";
+import { metricValue } from "@/lib/ranking";
 
 export type DiffTone = "pos" | "neg" | "neutral";
 
-// Dead-zone so tiny divergences read as neutral rather than green/red noise.
+// Per-team differential colouring.
 const NEUTRAL_BAND = 0.25;
-// Beyond this deficit a goal is strongly "owed" → apply the startling effect.
 const HOT_DEFICIT = 0.75;
 
 export function classifyDiff(diff: number | null): DiffTone {
@@ -22,20 +19,34 @@ export function classifyDiff(diff: number | null): DiffTone {
   return "neutral";
 }
 
-/** True when a team is far enough below its xG that a goal is strongly due. */
+/** A team far enough below its xG that a goal is strongly due → startling. */
 export function diffIsHot(diff: number | null): boolean {
   return diff !== null && diff <= -HOT_DEFICIT;
 }
 
-/** Tone for the match-level "goals owed" headline. */
-export function owedTone(goalsOwed: number | null): DiffTone {
-  if (goalsOwed === null) return "neutral";
-  if (goalsOwed >= NEUTRAL_BAND) return "neg"; // something is owed → alert color
+// Match-level headline (net xG or goals owed). A high positive value means the
+// match has under-scored its chances → "goals due" → alert colour + pulse.
+const HEADLINE_HOT = 1.1; // matches the default alert threshold
+const HEADLINE_WARM = 0.4;
+
+export function headlineTone(value: number | null): DiffTone {
+  if (value === null) return "neutral";
+  if (value >= HEADLINE_WARM) return "neg"; // due a goal → alert colour
+  if (value <= -HEADLINE_WARM) return "pos"; // over-scored → calm/green
   return "neutral";
 }
 
-export function owedIsHot(goalsOwed: number | null): boolean {
-  return goalsOwed !== null && goalsOwed >= 1;
+export function headlineIsHot(value: number | null): boolean {
+  return value !== null && value >= HEADLINE_HOT;
+}
+
+/** Short label under the headline number for the active metric. */
+export function metricLabel(metric: Metric): string {
+  return metric === "owed" ? "goals owed" : "xG − goals";
+}
+
+export function headlineValue(m: RankedMatch, metric: Metric): number | null {
+  return metricValue(m, metric);
 }
 
 export function signed(value: number | null, digits = 2): string {
@@ -44,7 +55,6 @@ export function signed(value: number | null, digits = 2): string {
   return `${s}${value.toFixed(digits)}`;
 }
 
-/** Compact remaining-time label, e.g. "34′ left". */
 export function fmtRemaining(remaining: number | null, status: string): string {
   if (status === "finished") return "full time";
   if (remaining === null) return "";

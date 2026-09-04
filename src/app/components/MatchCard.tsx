@@ -1,11 +1,13 @@
-import type { RankedMatch } from "@/lib/types";
+import type { Metric, RankedMatch } from "@/lib/types";
 import { fmtMinute, fmtXg, providerLabel } from "./format";
 import {
   classifyDiff,
   diffIsHot,
   fmtRemaining,
-  owedIsHot,
-  owedTone,
+  headlineIsHot,
+  headlineTone,
+  headlineValue,
+  metricLabel,
   signed,
 } from "./metrics";
 
@@ -39,7 +41,15 @@ function TeamRow({ team }: { team: TeamView }) {
   );
 }
 
-export function MatchCard({ match, rank }: { match: RankedMatch; rank: number }) {
+export function MatchCard({
+  match,
+  rank,
+  metric,
+}: {
+  match: RankedMatch;
+  rank: number;
+  metric: Metric;
+}) {
   const live = match.status === "live" || match.status === "halftime";
 
   const rows: TeamView[] = [
@@ -51,9 +61,9 @@ export function MatchCard({ match, rank }: { match: RankedMatch; rank: number })
     rows.sort((a, b) => (a.diff ?? 0) - (b.diff ?? 0));
   }
 
-  const owed = match.goalsOwed;
-  const tone = owedTone(owed);
-  const hot = owedIsHot(owed);
+  const value = headlineValue(match, metric);
+  const tone = headlineTone(value);
+  const hot = headlineIsHot(value);
 
   return (
     <div className="card">
@@ -82,13 +92,13 @@ export function MatchCard({ match, rank }: { match: RankedMatch; rank: number })
         </div>
       </div>
 
-      <div className={`metric ${owed === null ? "na" : tone}${hot ? " hot" : ""}`}>
-        {owed === null ? (
+      <div className={`metric ${value === null ? "na" : tone}${hot ? " hot" : ""}`}>
+        {value === null ? (
           <span className="metric-na">xG unavailable</span>
         ) : (
           <>
-            <span className="metric-value">{owed.toFixed(2)}</span>
-            <span className="metric-unit">goals owed</span>
+            <span className="metric-value">{signed(value)}</span>
+            <span className="metric-unit">{metricLabel(metric)}</span>
           </>
         )}
       </div>

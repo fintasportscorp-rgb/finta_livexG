@@ -3,7 +3,8 @@
 // "already alerted" set can be persisted by the caller (e.g. the GitHub Actions
 // workflow persists it between runs). This gives correct de-dup across restarts:
 //
-//   - Alert once when a match CROSSES the threshold (default 1.1 goals owed).
+//   - Alert once when a match CROSSES the threshold on the NET metric (default
+//     1.1) — i.e. total xG exceeds total goals by ≥ threshold.
 //   - Suppress while it stays elevated.
 //   - Re-arm once it falls below (threshold - CLEAR_BAND), so a later re-cross
 //     alerts again. Rise → alert → fall → rise → alert again.
@@ -55,7 +56,8 @@ export function evaluateCrossings(
   for (const m of matches) {
     if (m.demo) continue;
     const key = matchKey(m);
-    const d = decide(next.has(key), m.goalsOwed, threshold);
+    // Alerts use the NET metric: total xG − total goals.
+    const d = decide(next.has(key), m.netXg, threshold);
     if (d === "send") {
       next.add(key);
       toSend.push(m);

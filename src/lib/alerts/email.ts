@@ -26,11 +26,19 @@ function fmt(n: number | null, digits = 2): string {
   return n === null ? "—" : n.toFixed(digits);
 }
 
-/** Build the alert email body for a match that has reached the owed threshold. */
+function signed(n: number | null, digits = 2): string {
+  if (n === null) return "—";
+  return `${n > 0 ? "+" : ""}${n.toFixed(digits)}`;
+}
+
+/** Build the alert email body for a match that crossed the net-xG threshold. */
 export function buildAlertEmail(match: RankedMatch): { subject: string; html: string; text: string } {
   const home = escapeHtml(match.homeTeam);
   const away = escapeHtml(match.awayTeam);
-  const owed = fmt(match.goalsOwed);
+  const net = signed(match.netXg); // headline: total xG − total goals
+  const totalXg =
+    match.homeXG !== null && match.awayXG !== null ? fmt(match.homeXG + match.awayXG) : "—";
+  const totalGoals = match.homeScore + match.awayScore;
   const minute = match.matchMinute ?? "—";
   const remaining = match.remainingMinutes ?? "—";
   const comp = match.competition ? escapeHtml(match.competition) : "—";
@@ -48,12 +56,12 @@ export function buildAlertEmail(match: RankedMatch): { subject: string; html: st
           ? `${match.matchMinute}'`
           : "LIVE";
 
-  const subject = `⚽ Goal due (${timeLabel}): ${match.homeTeam} ${match.homeScore}-${match.awayScore} ${match.awayTeam} — ${owed} owed · xG ${homeXg}–${awayXg}`;
+  const subject = `⚽ Goal due (${timeLabel}): ${match.homeTeam} ${match.homeScore}-${match.awayScore} ${match.awayTeam} — ${net} xG−goals`;
 
   const text = [
     `${match.homeTeam} ${match.homeScore}-${match.awayScore} ${match.awayTeam}`,
     `Match time: ${timeLabel} (~${remaining}' left)`,
-    `Goals owed (xG not yet converted): ${owed}`,
+    `Net xG − goals: ${net}  (total xG ${totalXg} vs ${totalGoals} goals)`,
     `Current xG — ${match.homeTeam} (home): ${homeXg} · ${match.awayTeam} (away): ${awayXg}`,
     `Home: ${match.homeScore} goals on ${homeXg} xG (diff ${fmt(match.homeDiff)})`,
     `Away: ${match.awayScore} goals on ${awayXg} xG (diff ${fmt(match.awayDiff)})`,
@@ -71,8 +79,8 @@ export function buildAlertEmail(match: RankedMatch): { subject: string; html: st
         ${home} <span style="font-variant-numeric:tabular-nums">${match.homeScore}–${match.awayScore}</span> ${away}
         <span style="font-size:12px;font-weight:700;color:#fff;background:#2ea043;padding:2px 9px;border-radius:999px;margin-left:8px;white-space:nowrap">${timeLabel}${match.status === "live" ? " LIVE" : ""}</span>
       </div>
-      <div style="font-size:32px;font-weight:800;color:#c0392b">${owed}</div>
-      <div style="text-transform:uppercase;letter-spacing:.05em;font-size:11px;color:#889">goals owed</div>
+      <div style="font-size:32px;font-weight:800;color:#c0392b">${net}</div>
+      <div style="text-transform:uppercase;letter-spacing:.05em;font-size:11px;color:#889">net xG − goals (total xG ${totalXg} vs ${totalGoals} goals)</div>
       <div style="margin-top:12px">
         <span style="display:inline-block;font-size:13px;padding:5px 11px;border:1px solid #e2e8f0;border-radius:999px;margin:0 6px 6px 0">${home} xG <b>${homeXg}</b></span>
         <span style="display:inline-block;font-size:13px;padding:5px 11px;border:1px solid #e2e8f0;border-radius:999px;margin:0 6px 6px 0">${away} xG <b>${awayXg}</b></span>
