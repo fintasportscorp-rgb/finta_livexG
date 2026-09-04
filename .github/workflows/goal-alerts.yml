@@ -1,0 +1,57 @@
+name: Goal-owed alerts
+
+# Free scheduler (no Vercel Pro needed). GitHub's minimum interval is 5 minutes,
+# and scheduled runs can be delayed a few minutes under load — that is fine for
+# this use case. De-dup state is persisted between runs via actions/cache, so a
+# match emails once per crossing (and again if it drops and re-crosses 1.1).
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+concurrency:
+  group: goal-alerts
+  cancel-in-progress: false # never interrupt a run mid-send
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Restore the persisted "already alerted" state from the most recent run.
+      - name: Restore alert state
+        uses: actions/cache/restore@v4
+        with:
+          path: .alert-state
+          key: alert-state-${{ github.run_id }}
+          restore-keys: |
+            alert-state-
+
+      - name: Run alert check
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_TO_EMAIL: ${{ secrets.ALERT_TO_EMAIL }}
+          ALERT_FROM_EMAIL: ${{ secrets.ALERT_FROM_EMAIL }}
+          ALERT_GOALS_OWED_THRESHOLD: ${{ vars.ALERT_GOALS_OWED_THRESHOLD || '1.1' }}
+          # Optional: set repo variable SITE_URL to fetch matches from the
+          # deployed dashboard instead of hitting FotMob directly from the runner.
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: npx tsx scripts/alert-check.ts
+
+      # Save the updated state under a fresh key (cache keys are immutable).
+      - name: Save alert state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .alert-state
+          key: alert-state-${{ github.run_id }}

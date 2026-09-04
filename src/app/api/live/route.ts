@@ -7,18 +7,16 @@ import { NextResponse } from "next/server";
 import { getLiveData } from "@/lib/orchestrator";
 import { rankMatches } from "@/lib/ranking";
 import { mockMatch } from "@/lib/mock";
-import { dispatchGoalOwedAlerts } from "@/lib/alerts/engine";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// This endpoint is read-only. Email alerts are handled out-of-band by the
+// GitHub Actions workflow (scripts/alert-check.ts) so de-dup state can persist
+// between runs — see .github/workflows/goal-alerts.yml.
 export async function GET(request: Request) {
   try {
     const data = await getLiveData();
-
-    // Fire alerts for any real match that just crossed the owed threshold.
-    // Fire-and-forget: alerting must never delay or break the live response.
-    void dispatchGoalOwedAlerts(data.matches).catch(() => {});
 
     // ?demo=1 injects one synthetic match so the dashboard can be visualized
     // even when no real matches are live. Disabled in production (VERCEL_ENV

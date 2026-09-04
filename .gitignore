@@ -9,3 +9,4 @@
 .vercel
 next-env.d.ts
 /coverage
+/.alert-state

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { shouldAlert, __resetAlertStateForTests } from "./engine";
+import { describe, expect, it } from "vitest";
+import { decide, evaluateCrossings } from "./engine";
 import type { RankedMatch } from "../types";
 
 function ranked(partial: Partial<RankedMatch>): RankedMatch {
@@ -31,42 +31,64 @@ function ranked(partial: Partial<RankedMatch>): RankedMatch {
   };
 }
 
-const THRESHOLD = 1.1;
+const T = 1.1;
 
-describe("shouldAlert", () => {
-  beforeEach(() => __resetAlertStateForTests());
-
-  it("alerts when a match first crosses the threshold", () => {
-    expect(shouldAlert(ranked({ goalsOwed: 1.2 }), THRESHOLD)).toBe(true);
+describe("decide", () => {
+  it("sends on first crossing, then stays quiet while elevated", () => {
+    expect(decide(false, 1.2, T)).toBe("send");
+    expect(decide(true, 1.2, T)).toBe("noop");
+    expect(decide(true, 1.15, T)).toBe("noop");
   });
 
-  it("does not alert below the threshold", () => {
-    expect(shouldAlert(ranked({ goalsOwed: 1.05 }), THRESHOLD)).toBe(false);
+  it("does not send below the threshold", () => {
+    expect(decide(false, 1.05, T)).toBe("noop");
   });
 
-  it("does not re-alert while it stays elevated (hysteresis)", () => {
-    expect(shouldAlert(ranked({ goalsOwed: 1.2 }), THRESHOLD)).toBe(true);
-    expect(shouldAlert(ranked({ goalsOwed: 1.2 }), THRESHOLD)).toBe(false);
-    expect(shouldAlert(ranked({ goalsOwed: 1.15 }), THRESHOLD)).toBe(false);
+  it("re-arms only after dropping below the clear band", () => {
+    expect(decide(true, 0.9, T)).toBe("noop"); // 0.9 > 1.1-0.3=0.8 → still armed
+    expect(decide(true, 0.5, T)).toBe("rearm");
   });
 
-  it("re-arms after dropping below the clear band, then alerts again", () => {
-    expect(shouldAlert(ranked({ goalsOwed: 1.3 }), THRESHOLD)).toBe(true);
-    // drops below threshold - 0.3 = 0.8 → re-armed
-    expect(shouldAlert(ranked({ goalsOwed: 0.5 }), THRESHOLD)).toBe(false);
-    expect(shouldAlert(ranked({ goalsOwed: 1.3 }), THRESHOLD)).toBe(true);
+  it("noop when xG is unavailable", () => {
+    expect(decide(false, null, T)).toBe("noop");
+  });
+});
+
+describe("evaluateCrossings", () => {
+  it("emails on first crossing and carries the state forward", () => {
+    const m = ranked({ sourceMatchId: "a", goalsOwed: 1.4 });
+    const r1 = evaluateCrossings([m], T, []);
+    expect(r1.toSend).toHaveLength(1);
+    expect(r1.alerted).toContain("fotmob:a");
+
+    // Same elevated match next run → no duplicate email.
+    const r2 = evaluateCrossings([m], T, r1.alerted);
+    expect(r2.toSend).toHaveLength(0);
   });
 
-  it("never alerts on demo matches", () => {
-    expect(shouldAlert(ranked({ goalsOwed: 2.0, demo: true }), THRESHOLD)).toBe(false);
+  it("re-alerts on a fresh crossing after it dropped and rose again", () => {
+    const key = "fotmob:a";
+    const high = ranked({ sourceMatchId: "a", goalsOwed: 1.4 });
+    const low = ranked({ sourceMatchId: "a", goalsOwed: 0.4 });
+
+    const afterFirst = evaluateCrossings([high], T, []).alerted;
+    const afterDrop = evaluateCrossings([low], T, afterFirst).alerted;
+    expect(afterDrop).not.toContain(key); // re-armed
+
+    const r = evaluateCrossings([high], T, afterDrop);
+    expect(r.toSend).toHaveLength(1); // alerts again
   });
 
-  it("does not alert when xG is unavailable", () => {
-    expect(shouldAlert(ranked({ goalsOwed: null }), THRESHOLD)).toBe(false);
+  it("never alerts demo matches", () => {
+    const r = evaluateCrossings([ranked({ goalsOwed: 2, demo: true })], T, []);
+    expect(r.toSend).toHaveLength(0);
   });
 
-  it("tracks matches independently by id", () => {
-    expect(shouldAlert(ranked({ sourceMatchId: "a", goalsOwed: 1.2 }), THRESHOLD)).toBe(true);
-    expect(shouldAlert(ranked({ sourceMatchId: "b", goalsOwed: 1.2 }), THRESHOLD)).toBe(true);
+  it("tracks matches independently", () => {
+    const a = ranked({ sourceMatchId: "a", goalsOwed: 1.4 });
+    const b = ranked({ sourceMatchId: "b", goalsOwed: 1.4 });
+    const r = evaluateCrossings([a, b], T, []);
+    expect(r.toSend).toHaveLength(2);
+    expect(r.alerted).toEqual(["fotmob:a", "fotmob:b"]);
   });
 });
