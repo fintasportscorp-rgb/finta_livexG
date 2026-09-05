@@ -73,7 +73,7 @@ export function buildAlertEmail(match: RankedMatch): { subject: string; html: st
   const html = `
   <div style="font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;max-width:520px;margin:0 auto;color:#0b0f14">
     <h2 style="margin:0 0 4px">⚽ A goal is due</h2>
-    <p style="margin:0 0 16px;color:#556">Finta Spot alert — a team has created well above what it has scored.</p>
+    <p style="margin:0 0 16px;color:#556">Finta Spot alert — combined xG has outrun the goals scored (net xG − goals ${net}).</p>
     <div style="border:1px solid #e2e8f0;border-radius:12px;padding:16px">
       <div style="font-size:18px;font-weight:700;margin-bottom:10px">
         ${home} <span style="font-variant-numeric:tabular-nums">${match.homeScore}–${match.awayScore}</span> ${away}
