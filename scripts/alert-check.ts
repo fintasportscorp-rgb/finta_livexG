@@ -13,34 +13,18 @@
 // Run: `npx tsx scripts/alert-check.ts`
 // ---------------------------------------------------------------------------
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { loadConfig } from "../src/lib/config";
 import { getLiveData } from "../src/lib/orchestrator";
 import { rankMatches } from "../src/lib/ranking";
 import { evaluateCrossings } from "../src/lib/alerts/engine";
 import { sendGoalOwedEmail } from "../src/lib/alerts/email";
+import { fileStore, upstashStore } from "../src/lib/alerts/store";
 import type { LiveDataResult, RankedMatch } from "../src/lib/types";
 
 const STATE_FILE = process.env.ALERT_STATE_FILE || ".alert-state/state.json";
 
-async function loadState(): Promise<string[]> {
-  try {
-    const raw = await fs.readFile(STATE_FILE, "utf8");
-    const parsed = JSON.parse(raw) as { alerted?: unknown };
-    return Array.isArray(parsed.alerted) ? (parsed.alerted as string[]) : [];
-  } catch {
-    return []; // first run / no state yet
-  }
-}
-
-async function saveState(alerted: string[]): Promise<void> {
-  await fs.mkdir(path.dirname(STATE_FILE), { recursive: true });
-  await fs.writeFile(
-    STATE_FILE,
-    JSON.stringify({ alerted, updatedAt: new Date().toISOString() }, null, 2),
-  );
-}
+// Share Upstash with the Vercel endpoint when configured; else a local file.
+const store = upstashStore() ?? fileStore(STATE_FILE);
 
 /** Add https:// when the scheme is missing; strip a trailing slash. */
 function normalizeSiteUrl(raw: string | undefined): string | null {
@@ -79,20 +63,20 @@ async function main(): Promise<void> {
   const cfg = loadConfig();
   const threshold = cfg.alertGoalsOwedThreshold;
 
-  const prev = await loadState();
+  const prev = await store.load();
   const { matches, source } = await fetchMatches();
   const { toSend, alerted } = evaluateCrossings(matches, threshold, prev);
 
   // Self-diagnostic line so a workflow run shows why it did/didn't send.
   console.log(
     `[alert-check] key=${cfg.resendApiKey ? "set" : "MISSING"} to=${cfg.alertToEmail} ` +
-      `source=${source} matches=${matches.length} threshold=${threshold} ` +
+      `store=${store.name} source=${source} matches=${matches.length} threshold=${threshold} ` +
       `prevAlerted=${prev.length} toSend=${toSend.length}`,
   );
 
   if (!cfg.alertsEnabled) {
     console.warn("[alert-check] alerts disabled (RESEND_API_KEY not set) — no emails sent.");
-    await saveState(alerted);
+    await store.save(alerted);
     return;
   }
 
@@ -111,7 +95,7 @@ async function main(): Promise<void> {
   }
 
   // Persist even on partial failure so we don't re-spam matches that did send.
-  await saveState(alerted);
+  await store.save(alerted);
   console.log(`[alert-check] done. sent=${sent}/${toSend.length}`);
 }
 

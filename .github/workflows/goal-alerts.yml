@@ -1,14 +1,12 @@
-name: Goal-owed alerts
+name: Goal-owed alerts (fallback)
 
-# Free scheduler (no Vercel Pro needed). GitHub's minimum interval is 5 minutes,
-# and scheduled runs can be delayed a few minutes under load — that is fine for
-# this use case. De-dup state is persisted between runs via actions/cache, so a
-# match emails once per crossing (and again if it drops and re-crosses 1.1).
+# Manual fallback only. The PRIMARY low-latency scheduler is cron-job.org hitting
+# the Vercel endpoint /api/alerts/check every ~60s. This workflow shares the same
+# Upstash de-dup state (when UPSTASH_* secrets are set), so running it manually
+# never double-sends. Kept as a backup if the external cron is down.
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"
-  workflow_dispatch: {} # allow manual runs from the Actions tab
+  workflow_dispatch: {} # run on demand from the Actions tab
 
 concurrency:
   group: goal-alerts
@@ -42,6 +40,9 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ALERT_TO_EMAIL: ${{ secrets.ALERT_TO_EMAIL }}
           ALERT_FROM_EMAIL: ${{ secrets.ALERT_FROM_EMAIL }}
+          # Share de-dup state with the Vercel endpoint (primary scheduler).
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           # Read from either a repo Variable or Secret; default 0.8 if unset.
           ALERT_GOALS_OWED_THRESHOLD: ${{ vars.ALERT_GOALS_OWED_THRESHOLD || secrets.ALERT_GOALS_OWED_THRESHOLD || '0.8' }}
           # Optional deployed dashboard URL (scheme auto-added if missing; a bad
