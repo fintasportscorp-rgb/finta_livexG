@@ -54,7 +54,10 @@ export function loadConfig(): AppConfig {
     // Alerts require a Resend key; enabled by default when one is present.
     alertsEnabled: boolEnv(process.env.ALERTS_ENABLED, true) && resendKey !== null,
     resendApiKey: resendKey,
-    alertToEmail: process.env.ALERT_TO_EMAIL?.trim() || "finta.sports.corp@gmail.com",
+    // Default to the Resend account address, which is the only recipient that
+    // works before a domain is verified. Override with ALERT_TO_EMAIL once a
+    // domain is set up (e.g. finta.sports.corp@gmail.com).
+    alertToEmail: process.env.ALERT_TO_EMAIL?.trim() || "vistao.sports@gmail.com",
     alertFromEmail: process.env.ALERT_FROM_EMAIL?.trim() || "Finta Spot <onboarding@resend.dev>",
     alertGoalsOwedThreshold: floatEnv(process.env.ALERT_GOALS_OWED_THRESHOLD, 1.1),
   };

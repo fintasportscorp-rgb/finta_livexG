@@ -83,9 +83,11 @@ async function main(): Promise<void> {
   const { matches, source } = await fetchMatches();
   const { toSend, alerted } = evaluateCrossings(matches, threshold, prev);
 
+  // Self-diagnostic line so a workflow run shows why it did/didn't send.
   console.log(
-    `[alert-check] source=${source} matches=${matches.length} ` +
-      `threshold=${threshold} prevAlerted=${prev.length} toSend=${toSend.length}`,
+    `[alert-check] key=${cfg.resendApiKey ? "set" : "MISSING"} to=${cfg.alertToEmail} ` +
+      `source=${source} matches=${matches.length} threshold=${threshold} ` +
+      `prevAlerted=${prev.length} toSend=${toSend.length}`,
   );
 
   if (!cfg.alertsEnabled) {
