@@ -42,21 +42,36 @@ async function saveState(alerted: string[]): Promise<void> {
   );
 }
 
-/** Prefer the deployed read endpoint (known-good FotMob egress) when provided. */
+/** Add https:// when the scheme is missing; strip a trailing slash. */
+function normalizeSiteUrl(raw: string | undefined): string | null {
+  if (!raw) return null;
+  let u = raw.trim().replace(/\/+$/, "");
+  if (!u) return null;
+  if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+  return u;
+}
+
+/**
+ * Prefer the deployed read endpoint (known-good FotMob egress) when provided,
+ * but NEVER let a bad SITE_URL kill alerting: on any failure, fall back to
+ * fetching FotMob directly. Metrics are always recomputed locally.
+ */
 async function fetchMatches(): Promise<{ matches: RankedMatch[]; source: string }> {
-  const siteUrl = process.env.SITE_URL?.replace(/\/$/, "");
+  const siteUrl = normalizeSiteUrl(process.env.SITE_URL);
   if (siteUrl) {
-    const res = await fetch(`${siteUrl}/api/live`, {
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) throw new Error(`SITE_URL /api/live returned HTTP ${res.status}`);
-    const data = (await res.json()) as LiveDataResult;
-    // Recompute locally so metrics (netXg) are correct even if the deployed
-    // site is serving an older payload shape.
-    return { matches: rankMatches(data.matches), source: `${siteUrl} (${data.activeProvider ?? "none"})` };
+    try {
+      const res = await fetch(`${siteUrl}/api/live`, { headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as LiveDataResult;
+      return { matches: rankMatches(data.matches), source: siteUrl };
+    } catch (e) {
+      console.warn(
+        `[alert-check] SITE_URL fetch failed (${e instanceof Error ? e.message : e}); ` +
+          `falling back to direct FotMob.`,
+      );
+    }
   }
   const data = await getLiveData();
-  // getLiveData already ranks, but re-rank defensively in case shape changes.
   return { matches: rankMatches(data.matches), source: `direct (${data.activeProvider ?? "none"})` };
 }
 
